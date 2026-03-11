@@ -1,11 +1,8 @@
 <!DOCTYPE html>
-
 <html>
 
 <head>
-
 <meta charset="UTF-8">
-
 <title>License Plate OCR Review Tool</title>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -36,19 +33,21 @@ border:1px solid black;
 .correct_box{
 background:#e6ffe6;
 padding:10px;
-min-height:150px;
 }
 
 .wrong_box{
 background:#ffe6e6;
 padding:10px;
-min-height:150px;
 }
 
 .unrec_box{
 background:#e6f0ff;
 padding:10px;
-min-height:150px;
+}
+
+.counter{
+font-size:20px;
+font-weight:bold;
 }
 
 </style>
@@ -59,9 +58,11 @@ min-height:150px;
 
 <h2>License Plate OCR Review Tool</h2>
 
-Folder Images <input type="file" id="imageFolder" webkitdirectory multiple>
+Folder Images
+<input type="file" id="imageFolder" webkitdirectory multiple>
 
-Excel <input type="file" id="excelFile">
+Excel
+<input type="file" id="excelFile">
 
 <p id="progress">0 / 0</p>
 
@@ -76,28 +77,41 @@ Excel <input type="file" id="excelFile">
 <img id="img">
 
 <p>
-Plate:
-<span id="plate"></span>
+Plate: <span id="plate"></span>
 </p>
 
 <input id="note" placeholder="error note">
 
 <br><br>
 
-<button onclick="markTrue()">True (→)</button> <button onclick="markFalse()">False (←)</button> <button onclick="markUnrec()">Unrec (Enter)</button> <button onclick="next()">Next</button> <button onclick="prev()">Previous (Shift + ←)</button>
+<button onclick="markTrue()">True (→)</button>
+<button onclick="markFalse()">False (←)</button>
+<button onclick="markUnrec()">Unrec (Enter)</button>
+<button onclick="next()">Next</button>
+<button onclick="prev()">Previous (Shift + ←)</button>
 
 </div>
 
 <div>
 
+<div class="correct_box">
 <h3>Correct</h3>
-<div id="correct" class="correct_box"></div>
+<div class="counter" id="correct_count">0</div>
+</div>
 
-<h3>Wrong</h3>
-<div id="wrong" class="wrong_box"></div>
+<br>
 
+<div class="wrong_box">
+<h3>False</h3>
+<div class="counter" id="wrong_count">0</div>
+</div>
+
+<br>
+
+<div class="unrec_box">
 <h3>Unrec</h3>
-<div id="unrec" class="unrec_box"></div>
+<div class="counter" id="unrec_count">0</div>
+</div>
 
 </div>
 
@@ -112,8 +126,13 @@ Plate:
 let images={}
 let rows=[]
 let index=0
+
 let results=[]
 let history=[]
+
+let correctCount=0
+let wrongCount=0
+let unrecCount=0
 
 
 // LOAD IMAGE FOLDER
@@ -128,8 +147,6 @@ let name=file.name.toLowerCase()
 images[name]=URL.createObjectURL(file)
 
 }
-
-console.log("Images loaded:",Object.keys(images).length)
 
 })
 
@@ -176,10 +193,9 @@ let imgName=raw.split(/[\\/]/).pop().toLowerCase()
 
 let url=images[imgName]
 
+
 // AUTO SKIP nếu ảnh không tồn tại
 if(!url){
-
-console.log("Skip missing:",imgName)
 
 results.push({
 image:row["License Plate Image"],
@@ -188,10 +204,11 @@ result:"unrec",
 note:"missing image"
 })
 
+unrecCount++
+updateCounter()
+
 index++
-
 load()
-
 return
 
 }
@@ -199,7 +216,18 @@ return
 document.getElementById("img").src=url
 document.getElementById("plate").innerText=row["License Plate"]||""
 document.getElementById("note").value=""
+
 document.getElementById("progress").innerText=(index+1)+" / "+rows.length
+
+}
+
+
+// UPDATE COUNTER
+function updateCounter(){
+
+document.getElementById("correct_count").innerText=correctCount
+document.getElementById("wrong_count").innerText=wrongCount
+document.getElementById("unrec_count").innerText=unrecCount
 
 }
 
@@ -219,7 +247,7 @@ load()
 // PREVIOUS
 function prev(){
 
-if(history.length===0) return
+if(history.length===0)return
 
 index=history.pop()
 
@@ -240,11 +268,9 @@ result:"true",
 note:""
 })
 
-let div=document.createElement("div")
+correctCount++
 
-div.innerText=row["License Plate Image"]
-
-document.getElementById("correct").appendChild(div)
+updateCounter()
 
 next()
 
@@ -265,11 +291,9 @@ result:"false",
 note:note
 })
 
-let div=document.createElement("div")
+wrongCount++
 
-div.innerText=row["License Plate Image"]+" | "+note
-
-document.getElementById("wrong").appendChild(div)
+updateCounter()
 
 next()
 
@@ -288,39 +312,33 @@ result:"unrec",
 note:""
 })
 
-let div=document.createElement("div")
+unrecCount++
 
-div.innerText=row["License Plate Image"]
-
-document.getElementById("unrec").appendChild(div)
+updateCounter()
 
 next()
 
 }
 
 
-// KEYBOARD CONTROL
+// KEYBOARD
 document.addEventListener("keydown",(e)=>{
 
-// SHIFT + LEFT → previous
 if(e.shiftKey && e.key==="ArrowLeft"){
 prev()
 return
 }
 
-// RIGHT → TRUE
 if(e.key==="ArrowRight"){
 markTrue()
 return
 }
 
-// LEFT → FALSE
 if(e.key==="ArrowLeft"){
 markFalse()
 return
 }
 
-// ENTER
 if(e.key==="Enter"){
 
 if(document.activeElement.id==="note"){
@@ -334,7 +352,7 @@ markUnrec()
 })
 
 
-// EXPORT RESULT
+// EXPORT
 function exportResult(){
 
 let total=results.length
@@ -375,333 +393,3 @@ XLSX.writeFile(wb,"review_result.xlsx")
 
 </body>
 </html>
-
-
-
-
-<!-- 
-<!DOCTYPE html>
-
-<html>
-
-<head>
-
-<meta charset="UTF-8">
-
-<title>License Plate OCR Review Tool</title>
-
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-<style>
-
-body{
-font-family:Arial;
-margin:20px;
-}
-
-.viewer{
-display:flex;
-gap:40px;
-}
-
-.left{
-width:600px;
-}
-
-img{
-width:600px;
-height:400px;
-object-fit:contain;
-border:1px solid black;
-}
-
-.correct_box{
-background:#e6ffe6;
-padding:10px;
-min-height:200px;
-}
-
-.wrong_box{
-background:#ffe6e6;
-padding:10px;
-min-height:200px;
-}
-
-.highlight{
-color:red;
-font-weight:bold;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<h2>License Plate OCR Review Tool</h2>
-
-Folder Images <input type="file" id="imageFolder" webkitdirectory multiple>
-
-Excel <input type="file" id="excelFile">
-
-<p id="progress">0 / 0</p>
-
-<hr>
-
-<div class="viewer">
-
-<div class="left">
-
-<h3>Current Image</h3>
-
-<img id="img">
-
-<p>
-Plate:
-<span id="plate"></span>
-</p>
-
-<input id="note" placeholder="error note">
-
-<br><br>
-
-<button onclick="markTrue()">True (→)</button> <button onclick="markFalse()">False (←)</button> <button onclick="next()">Next (Enter)</button> <button onclick="prev()">Previous (Shift + ←)</button>
-
-</div>
-
-<div>
-
-<h3>Correct</h3>
-<div id="correct" class="correct_box"></div>
-
-<h3>Wrong</h3>
-<div id="wrong" class="wrong_box"></div>
-
-</div>
-
-</div>
-
-<hr>
-
-<button onclick="exportResult()">Export Result</button>
-
-<script>
-
-let images={}
-let rows=[]
-let index=0
-let results=[]
-let history=[]
-
-
-// LOAD IMAGE FOLDER
-document.getElementById("imageFolder").addEventListener("change",(e)=>{
-
-images={}
-
-for(let file of e.target.files){
-
-let name=file.name.toLowerCase()
-
-images[name]=URL.createObjectURL(file)
-
-}
-
-console.log("Images loaded:",Object.keys(images).length)
-
-})
-
-
-// LOAD EXCEL
-document.getElementById("excelFile").addEventListener("change",(e)=>{
-
-let reader=new FileReader()
-
-reader.onload=function(evt){
-
-let data=new Uint8Array(evt.target.result)
-
-let workbook=XLSX.read(data,{type:"array"})
-
-let sheet=workbook.Sheets[workbook.SheetNames[0]]
-
-rows=XLSX.utils.sheet_to_json(sheet)
-
-index=0
-
-load()
-
-}
-
-reader.readAsArrayBuffer(e.target.files[0])
-
-})
-
-
-// LOAD IMAGE
-function load(){
-
-if(index>=rows.length){
-alert("Finished")
-return
-}
-
-let row=rows[index]
-
-let raw=row["License Plate Image"]||""
-
-let imgName=raw.split(/[\\/]/).pop().toLowerCase()
-
-let url=images[imgName]
-
-console.log("search:",imgName)
-
-// AUTO SKIP nếu ảnh không tồn tại
-if(!url){
-
-console.log("Skip missing image:",imgName)
-
-index++
-
-load()
-
-return
-
-}
-
-document.getElementById("img").src=url||""
-
-document.getElementById("plate").innerText=row["License Plate"]||""
-
-document.getElementById("note").value=""
-
-document.getElementById("progress").innerText=(index+1)+" / "+rows.length
-
-}
-
-
-// NEXT
-function next(){
-
-history.push(index)
-
-index++
-
-load()
-
-}
-
-
-// PREVIOUS
-function prev(){
-
-if(history.length===0) return
-
-index=history.pop()
-
-load()
-
-}
-
-
-// TRUE
-function markTrue(){
-
-let row=rows[index]
-
-results.push({
-image:row["License Plate Image"],
-plate:row["License Plate"],
-result:"true",
-note:""
-})
-
-let div=document.createElement("div")
-
-div.innerText=row["License Plate Image"]
-
-document.getElementById("correct").appendChild(div)
-
-next()
-
-}
-
-
-// FALSE
-function markFalse(){
-
-let row=rows[index]
-
-let note=document.getElementById("note").value
-
-results.push({
-image:row["License Plate Image"],
-plate:row["License Plate"],
-result:"false",
-note:note
-})
-
-let div=document.createElement("div")
-
-div.innerText=row["License Plate Image"]+" | "+note
-
-document.getElementById("wrong").appendChild(div)
-
-next()
-
-}
-
-
-// KEYBOARD CONTROL
-document.addEventListener("keydown",(e)=>{
-
-// Shift + ArrowLeft → Previous
-if(e.shiftKey && e.key==="ArrowLeft"){
-prev()
-return
-}
-
-// ArrowRight → True
-if(e.key==="ArrowRight"){
-markTrue()
-return
-}
-
-// ArrowLeft → False
-if(e.key==="ArrowLeft"){
-markFalse()
-return
-}
-
-// Enter
-if(e.key==="Enter"){
-
-// nếu đang focus note → false
-if(document.activeElement.id==="note"){
-markFalse()
-}else{
-next()
-}
-
-}
-
-})
-
-
-// EXPORT RESULT
-function exportResult(){
-
-let ws=XLSX.utils.json_to_sheet(results)
-
-let wb=XLSX.utils.book_new()
-
-XLSX.utils.book_append_sheet(wb,ws,"result")
-
-XLSX.writeFile(wb,"review_result.xlsx")
-
-}
-
-</script>
-
-</body>
-</html> -->
