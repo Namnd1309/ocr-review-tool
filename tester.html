@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>License Plate OCR Review Tool</title>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+margin:20px;
+}
+
+.viewer{
+display:flex;
+gap:40px;
+}
+
+.left{
+width:600px;
+}
+
+img{
+width:600px;
+height:400px;
+object-fit:contain;
+border:1px solid black;
+}
+
+.correct_box{
+background:#e6ffe6;
+padding:10px;
+min-height:150px;
+}
+
+.wrong_box{
+background:#ffe6e6;
+padding:10px;
+min-height:150px;
+}
+
+.unrec_box{
+background:#e6f0ff;
+padding:10px;
+min-height:150px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2>License Plate OCR Review Tool</h2>
+
+Folder Images <input type="file" id="imageFolder" webkitdirectory multiple>
+
+Excel <input type="file" id="excelFile">
+
+<p id="progress">0 / 0</p>
+
+<hr>
+
+<div class="viewer">
+
+<div class="left">
+
+<h3>Current Image</h3>
+
+<img id="img">
+
+<p>
+Plate:
+<span id="plate"></span>
+</p>
+
+<input id="note" placeholder="error note">
+
+<br><br>
+
+<button onclick="markTrue()">True (→)</button> <button onclick="markFalse()">False (←)</button> <button onclick="markUnrec()">Unrec (Enter)</button> <button onclick="next()">Next</button> <button onclick="prev()">Previous (Shift + ←)</button>
+
+</div>
+
+<div>
+
+<h3>Correct</h3>
+<div id="correct" class="correct_box"></div>
+
+<h3>Wrong</h3>
+<div id="wrong" class="wrong_box"></div>
+
+<h3>Unrec</h3>
+<div id="unrec" class="unrec_box"></div>
+
+</div>
+
+</div>
+
+<hr>
+
+<button onclick="exportResult()">Export Result</button>
+
+<script>
+
+let images={}
+let rows=[]
+let index=0
+let results=[]
+let history=[]
+
+
+// LOAD IMAGE FOLDER
+document.getElementById("imageFolder").addEventListener("change",(e)=>{
+
+images={}
+
+for(let file of e.target.files){
+
+let name=file.name.toLowerCase()
+
+images[name]=URL.createObjectURL(file)
+
+}
+
+console.log("Images loaded:",Object.keys(images).length)
+
+})
+
+
+// LOAD EXCEL
+document.getElementById("excelFile").addEventListener("change",(e)=>{
+
+let reader=new FileReader()
+
+reader.onload=function(evt){
+
+let data=new Uint8Array(evt.target.result)
+
+let workbook=XLSX.read(data,{type:"array"})
+
+let sheet=workbook.Sheets[workbook.SheetNames[0]]
+
+rows=XLSX.utils.sheet_to_json(sheet)
+
+index=0
+
+load()
+
+}
+
+reader.readAsArrayBuffer(e.target.files[0])
+
+})
+
+
+// LOAD IMAGE
+function load(){
+
+if(index>=rows.length){
+alert("Finished")
+return
+}
+
+let row=rows[index]
+
+let raw=row["License Plate Image"]||""
+
+let imgName=raw.split(/[\\/]/).pop().toLowerCase()
+
+let url=images[imgName]
+
+// AUTO SKIP nếu ảnh không tồn tại
+if(!url){
+
+console.log("Skip missing:",imgName)
+
+results.push({
+image:row["License Plate Image"],
+plate:row["License Plate"],
+result:"unrec",
+note:"missing image"
+})
+
+index++
+
+load()
+
+return
+
+}
+
+document.getElementById("img").src=url
+document.getElementById("plate").innerText=row["License Plate"]||""
+document.getElementById("note").value=""
+document.getElementById("progress").innerText=(index+1)+" / "+rows.length
+
+}
+
+
+// NEXT
+function next(){
+
+history.push(index)
+
+index++
+
+load()
+
+}
+
+
+// PREVIOUS
+function prev(){
+
+if(history.length===0) return
+
+index=history.pop()
+
+load()
+
+}
+
+
+// TRUE
+function markTrue(){
+
+let row=rows[index]
+
+results.push({
+image:row["License Plate Image"],
+plate:row["License Plate"],
+result:"true",
+note:""
+})
+
+let div=document.createElement("div")
+
+div.innerText=row["License Plate Image"]
+
+document.getElementById("correct").appendChild(div)
+
+next()
+
+}
+
+
+// FALSE
+function markFalse(){
+
+let row=rows[index]
+
+let note=document.getElementById("note").value
+
+results.push({
+image:row["License Plate Image"],
+plate:row["License Plate"],
+result:"false",
+note:note
+})
+
+let div=document.createElement("div")
+
+div.innerText=row["License Plate Image"]+" | "+note
+
+document.getElementById("wrong").appendChild(div)
+
+next()
+
+}
+
+
+// UNREC
+function markUnrec(){
+
+let row=rows[index]
+
+results.push({
+image:row["License Plate Image"],
+plate:row["License Plate"],
+result:"unrec",
+note:""
+})
+
+let div=document.createElement("div")
+
+div.innerText=row["License Plate Image"]
+
+document.getElementById("unrec").appendChild(div)
+
+next()
+
+}
+
+
+// KEYBOARD CONTROL
+document.addEventListener("keydown",(e)=>{
+
+// SHIFT + LEFT → previous
+if(e.shiftKey && e.key==="ArrowLeft"){
+prev()
+return
+}
+
+// RIGHT → TRUE
+if(e.key==="ArrowRight"){
+markTrue()
+return
+}
+
+// LEFT → FALSE
+if(e.key==="ArrowLeft"){
+markFalse()
+return
+}
+
+// ENTER
+if(e.key==="Enter"){
+
+if(document.activeElement.id==="note"){
+markFalse()
+}else{
+markUnrec()
+}
+
+}
+
+})
+
+
+// EXPORT RESULT
+function exportResult(){
+
+let total=results.length
+
+let trueCount=results.filter(r=>r.result==="true").length
+let falseCount=results.filter(r=>r.result==="false").length
+let unrecCount=results.filter(r=>r.result==="unrec").length
+
+let acc=total?trueCount/total:0
+let falseRate=total?falseCount/total:0
+let unrecRate=total?unrecCount/total:0
+
+let summary=[
+
+{Metric:"Total",Value:total},
+{Metric:"True",Value:trueCount},
+{Metric:"False",Value:falseCount},
+{Metric:"Unrec",Value:unrecCount},
+{Metric:"Accuracy",Value:acc},
+{Metric:"False Rate",Value:falseRate},
+{Metric:"Unrec Rate",Value:unrecRate}
+
+]
+
+let ws1=XLSX.utils.json_to_sheet(results)
+let ws2=XLSX.utils.json_to_sheet(summary)
+
+let wb=XLSX.utils.book_new()
+
+XLSX.utils.book_append_sheet(wb,ws1,"results")
+XLSX.utils.book_append_sheet(wb,ws2,"summary")
+
+XLSX.writeFile(wb,"review_result.xlsx")
+
+}
+
+</script>
+
+</body>
+</html>
+
+
+
+
+<!-- 
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>License Plate OCR Review Tool</title>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+margin:20px;
+}
+
+.viewer{
+display:flex;
+gap:40px;
+}
+
+.left{
+width:600px;
+}
+
+img{
+width:600px;
+height:400px;
+object-fit:contain;
+border:1px solid black;
+}
+
+.correct_box{
+background:#e6ffe6;
+padding:10px;
+min-height:200px;
+}
+
+.wrong_box{
+background:#ffe6e6;
+padding:10px;
+min-height:200px;
+}
+
+.highlight{
+color:red;
+font-weight:bold;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2>License Plate OCR Review Tool</h2>
+
+Folder Images <input type="file" id="imageFolder" webkitdirectory multiple>
+
+Excel <input type="file" id="excelFile">
+
+<p id="progress">0 / 0</p>
+
+<hr>
+
+<div class="viewer">
+
+<div class="left">
+
+<h3>Current Image</h3>
+
+<img id="img">
+
+<p>
+Plate:
+<span id="plate"></span>
+</p>
+
+<input id="note" placeholder="error note">
+
+<br><br>
+
+<button onclick="markTrue()">True (→)</button> <button onclick="markFalse()">False (←)</button> <button onclick="next()">Next (Enter)</button> <button onclick="prev()">Previous (Shift + ←)</button>
+
+</div>
+
+<div>
+
+<h3>Correct</h3>
+<div id="correct" class="correct_box"></div>
+
+<h3>Wrong</h3>
+<div id="wrong" class="wrong_box"></div>
+
+</div>
+
+</div>
+
+<hr>
+
+<button onclick="exportResult()">Export Result</button>
+
+<script>
+
+let images={}
+let rows=[]
+let index=0
+let results=[]
+let history=[]
+
+
+// LOAD IMAGE FOLDER
+document.getElementById("imageFolder").addEventListener("change",(e)=>{
+
+images={}
+
+for(let file of e.target.files){
+
+let name=file.name.toLowerCase()
+
+images[name]=URL.createObjectURL(file)
+
+}
+
+console.log("Images loaded:",Object.keys(images).length)
+
+})
+
+
+// LOAD EXCEL
+document.getElementById("excelFile").addEventListener("change",(e)=>{
+
+let reader=new FileReader()
+
+reader.onload=function(evt){
+
+let data=new Uint8Array(evt.target.result)
+
+let workbook=XLSX.read(data,{type:"array"})
+
+let sheet=workbook.Sheets[workbook.SheetNames[0]]
+
+rows=XLSX.utils.sheet_to_json(sheet)
+
+index=0
+
+load()
+
+}
+
+reader.readAsArrayBuffer(e.target.files[0])
+
+})
+
+
+// LOAD IMAGE
+function load(){
+
+if(index>=rows.length){
+alert("Finished")
+return
+}
+
+let row=rows[index]
+
+let raw=row["License Plate Image"]||""
+
+let imgName=raw.split(/[\\/]/).pop().toLowerCase()
+
+let url=images[imgName]
+
+console.log("search:",imgName)
+
+// AUTO SKIP nếu ảnh không tồn tại
+if(!url){
+
+console.log("Skip missing image:",imgName)
+
+index++
+
+load()
+
+return
+
+}
+
+document.getElementById("img").src=url||""
+
+document.getElementById("plate").innerText=row["License Plate"]||""
+
+document.getElementById("note").value=""
+
+document.getElementById("progress").innerText=(index+1)+" / "+rows.length
+
+}
+
+
+// NEXT
+function next(){
+
+history.push(index)
+
+index++
+
+load()
+
+}
+
+
+// PREVIOUS
+function prev(){
+
+if(history.length===0) return
+
+index=history.pop()
+
+load()
+
+}
+
+
+// TRUE
+function markTrue(){
+
+let row=rows[index]
+
+results.push({
+image:row["License Plate Image"],
+plate:row["License Plate"],
+result:"true",
+note:""
+})
+
+let div=document.createElement("div")
+
+div.innerText=row["License Plate Image"]
+
+document.getElementById("correct").appendChild(div)
+
+next()
+
+}
+
+
+// FALSE
+function markFalse(){
+
+let row=rows[index]
+
+let note=document.getElementById("note").value
+
+results.push({
+image:row["License Plate Image"],
+plate:row["License Plate"],
+result:"false",
+note:note
+})
+
+let div=document.createElement("div")
+
+div.innerText=row["License Plate Image"]+" | "+note
+
+document.getElementById("wrong").appendChild(div)
+
+next()
+
+}
+
+
+// KEYBOARD CONTROL
+document.addEventListener("keydown",(e)=>{
+
+// Shift + ArrowLeft → Previous
+if(e.shiftKey && e.key==="ArrowLeft"){
+prev()
+return
+}
+
+// ArrowRight → True
+if(e.key==="ArrowRight"){
+markTrue()
+return
+}
+
+// ArrowLeft → False
+if(e.key==="ArrowLeft"){
+markFalse()
+return
+}
+
+// Enter
+if(e.key==="Enter"){
+
+// nếu đang focus note → false
+if(document.activeElement.id==="note"){
+markFalse()
+}else{
+next()
+}
+
+}
+
+})
+
+
+// EXPORT RESULT
+function exportResult(){
+
+let ws=XLSX.utils.json_to_sheet(results)
+
+let wb=XLSX.utils.book_new()
+
+XLSX.utils.book_append_sheet(wb,ws,"result")
+
+XLSX.writeFile(wb,"review_result.xlsx")
+
+}
+
+</script>
+
+</body>
+</html> -->
