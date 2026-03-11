@@ -130,10 +130,6 @@ let index=0
 let results=[]
 let history=[]
 
-let correctCount=0
-let wrongCount=0
-let unrecCount=0
-
 
 // LOAD IMAGE FOLDER
 document.getElementById("imageFolder").addEventListener("change",(e)=>{
@@ -167,6 +163,8 @@ let sheet=workbook.Sheets[workbook.SheetNames[0]]
 rows=XLSX.utils.sheet_to_json(sheet)
 
 index=0
+results=[]
+history=[]
 
 load()
 
@@ -175,6 +173,20 @@ load()
 reader.readAsArrayBuffer(e.target.files[0])
 
 })
+
+
+// UPDATE COUNTER (tính lại từ results để tránh sai)
+function updateCounter(){
+
+let correct=results.filter(r=>r.result==="true").length
+let wrong=results.filter(r=>r.result==="false").length
+let unrec=results.filter(r=>r.result==="unrec").length
+
+document.getElementById("correct_count").innerText=correct
+document.getElementById("wrong_count").innerText=wrong
+document.getElementById("unrec_count").innerText=unrec
+
+}
 
 
 // LOAD IMAGE
@@ -204,7 +216,6 @@ result:"unrec",
 note:"missing image"
 })
 
-unrecCount++
 updateCounter()
 
 index++
@@ -222,16 +233,6 @@ document.getElementById("progress").innerText=(index+1)+" / "+rows.length
 }
 
 
-// UPDATE COUNTER
-function updateCounter(){
-
-document.getElementById("correct_count").innerText=correctCount
-document.getElementById("wrong_count").innerText=wrongCount
-document.getElementById("unrec_count").innerText=unrecCount
-
-}
-
-
 // NEXT
 function next(){
 
@@ -244,11 +245,17 @@ load()
 }
 
 
-// PREVIOUS
+// PREVIOUS (UNDO)
 function prev(){
 
 if(history.length===0)return
 
+// xoá kết quả cuối
+results.pop()
+
+updateCounter()
+
+// quay lại index
 index=history.pop()
 
 load()
@@ -267,8 +274,6 @@ plate:row["License Plate"],
 result:"true",
 note:""
 })
-
-correctCount++
 
 updateCounter()
 
@@ -291,8 +296,6 @@ result:"false",
 note:note
 })
 
-wrongCount++
-
 updateCounter()
 
 next()
@@ -311,8 +314,6 @@ plate:row["License Plate"],
 result:"unrec",
 note:""
 })
-
-unrecCount++
 
 updateCounter()
 
