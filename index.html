@@ -137,11 +137,8 @@ document.getElementById("imageFolder").addEventListener("change",(e)=>{
 images={}
 
 for(let file of e.target.files){
-
 let name=file.name.toLowerCase()
-
 images[name]=URL.createObjectURL(file)
-
 }
 
 })
@@ -157,14 +154,16 @@ reader.onload=function(evt){
 let data=new Uint8Array(evt.target.result)
 
 let workbook=XLSX.read(data,{type:"array"})
-
 let sheet=workbook.Sheets[workbook.SheetNames[0]]
 
-rows=XLSX.utils.sheet_to_json(sheet)
+/* bỏ dòng rỗng */
+rows=XLSX.utils.sheet_to_json(sheet).filter(r=>r["License Plate Image"])
 
 index=0
 results=[]
 history=[]
+
+updateCounter()
 
 load()
 
@@ -175,7 +174,7 @@ reader.readAsArrayBuffer(e.target.files[0])
 })
 
 
-// UPDATE COUNTER (tính lại từ results để tránh sai)
+// UPDATE COUNTER
 function updateCounter(){
 
 let correct=results.filter(r=>r.result==="true").length
@@ -192,21 +191,16 @@ document.getElementById("unrec_count").innerText=unrec
 // LOAD IMAGE
 function load(){
 
-if(index>=rows.length){
-alert("Finished")
-return
-}
+while(index < rows.length){
 
 let row=rows[index]
 
-let raw=row["License Plate Image"]||""
-
+let raw=row["License Plate Image"] || ""
 let imgName=raw.split(/[\\/]/).pop().toLowerCase()
 
 let url=images[imgName]
 
-
-// AUTO SKIP nếu ảnh không tồn tại
+/* skip ảnh missing */
 if(!url){
 
 results.push({
@@ -216,19 +210,23 @@ result:"unrec",
 note:"missing image"
 })
 
+index++
+continue
+}
+
+document.getElementById("img").src=url
+document.getElementById("plate").innerText=row["License Plate"] || ""
+document.getElementById("note").value=""
+
+document.getElementById("progress").innerText=(index+1)+" / "+rows.length
+
 updateCounter()
 
-index++
-load()
 return
 
 }
 
-document.getElementById("img").src=url
-document.getElementById("plate").innerText=row["License Plate"]||""
-document.getElementById("note").value=""
-
-document.getElementById("progress").innerText=(index+1)+" / "+rows.length
+alert("Finished")
 
 }
 
@@ -250,13 +248,11 @@ function prev(){
 
 if(history.length===0)return
 
-// xoá kết quả cuối
+index=history.pop()
+
 results.pop()
 
 updateCounter()
-
-// quay lại index
-index=history.pop()
 
 load()
 
@@ -274,8 +270,6 @@ plate:row["License Plate"],
 result:"true",
 note:""
 })
-
-updateCounter()
 
 next()
 
@@ -296,8 +290,6 @@ result:"false",
 note:note
 })
 
-updateCounter()
-
 next()
 
 }
@@ -314,8 +306,6 @@ plate:row["License Plate"],
 result:"unrec",
 note:""
 })
-
-updateCounter()
 
 next()
 
@@ -394,3 +384,4 @@ XLSX.writeFile(wb,"review_result.xlsx")
 
 </body>
 </html>
+
